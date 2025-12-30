@@ -14,6 +14,8 @@ face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidenc
 
 img_boohoo = cv2.imread('Assets/boohoo.webp')
 img_smile = cv2.imread('Assets/smile.webp')
+img_neutral = cv2.imread('Assets/neutral.webp')
+img_hide = cv2.imread('Assets/hide.webp')
 
 cap = cv2.VideoCapture(0)
 
@@ -28,21 +30,26 @@ while cap.isOpened():
     face_results = face_mesh.process(rgb_frame)
     hand_results = hands.process(rgb_frame)
 
+    # display_img will show the Emote pictures
+    # skeleton_img will show the user with landmarks
     display_img = frame.copy()
+    skeleton_img = frame.copy()
 
+    emote_active = False
+    face_center_x, face_center_y = 0.5, 0.5
     mouth_x, mouth_y = 0.5, 0.5
 
-    # --- FACE LOGIC & SKELETON ---
+    # --- FACE LOGIC ---
     if face_results.multi_face_landmarks:
         for face_lms in face_results.multi_face_landmarks:
-            mp_draw.draw_landmarks(display_img, face_lms, mp_connections.FACEMESH_TESSELATION,
+            mp_draw.draw_landmarks(skeleton_img, face_lms, mp_connections.FACEMESH_TESSELATION,
                                    None, mp_draw.DrawingSpec(color=(200, 200, 200), thickness=1, circle_radius=1))
 
-            # Landmark 13 is the center of the lips
+            face_center_x = face_lms.landmark[1].x
+            face_center_y = face_lms.landmark[1].y
             mouth_x = face_lms.landmark[13].x
             mouth_y = face_lms.landmark[13].y
 
-            # Smile Ratio Logic
             m_left, m_right = face_lms.landmark[61], face_lms.landmark[291]
             e_left, e_right = face_lms.landmark[33], face_lms.landmark[263]
             smile_ratio = abs(m_left.x - m_right.x) / abs(e_left.x - e_right.x)
@@ -50,27 +57,44 @@ while cap.isOpened():
             if smile_ratio > 0.75:
                 if img_smile is not None:
                     display_img = cv2.resize(img_smile, (w, h))
+                    emote_active = True
 
     # --- HAND LOGIC ---
     if hand_results.multi_hand_landmarks and len(hand_results.multi_hand_landmarks) == 2:
-        fists_in_position = 0
+        fists_near_mouth = 0
+        open_hands_covering_face = 0
 
         for hand_lms in hand_results.multi_hand_landmarks:
-            mp_draw.draw_landmarks(display_img, hand_lms, mp_hands.HAND_CONNECTIONS)
+            mp_draw.draw_landmarks(skeleton_img, hand_lms, mp_hands.HAND_CONNECTIONS)
 
-            knuckle = hand_lms.landmark[5]
+            palm_x, palm_y = hand_lms.landmark[0].x, hand_lms.landmark[0].y
+            knuckle_x, knuckle_y = hand_lms.landmark[5].x, hand_lms.landmark[5].y
 
             is_fist = hand_lms.landmark[8].y > hand_lms.landmark[5].y
 
-            dist_to_mouth = math.sqrt((knuckle.x - mouth_x) ** 2 + (knuckle.y - mouth_y) ** 2)
+            dist_to_face = math.sqrt((palm_x - face_center_x) ** 2 + (palm_y - face_center_y) ** 2)
+            if dist_to_face < 0.2 and not is_fist:
+                open_hands_covering_face += 1
 
+            dist_to_mouth = math.sqrt((knuckle_x - mouth_x) ** 2 + (knuckle_y - mouth_y) ** 2)
             if is_fist and dist_to_mouth < 0.15:
-                fists_in_position += 1
+                fists_near_mouth += 1
 
-        if fists_in_position == 2 and img_boohoo is not None:
+        if open_hands_covering_face == 2 and img_hide is not None:
+            display_img = cv2.resize(img_hide, (w, h))
+            emote_active = True
+        elif fists_near_mouth == 2 and img_boohoo is not None:
             display_img = cv2.resize(img_boohoo, (w, h))
+            emote_active = True
 
-    cv2.imshow("Clash Emotes AI", display_img)
+    # --- NEUTRAL FACE LOGIC ---
+    if not emote_active and img_neutral is not None:
+        display_img = cv2.resize(img_neutral, (w, h))
+
+    # --- OUTPUT ---
+    cv2.imshow("Output: Clash Emotes", display_img)
+    cv2.imshow("Input: Skeleton Tracker", skeleton_img)
+
     if cv2.waitKey(1) & 0xFF == ord('q'): break
 
 cap.release()
