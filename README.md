@@ -1,75 +1,69 @@
-# Clash Royale Emote Controller
+# Real-Time Gesture-Controlled AR Emote Overlay
 
-This project uses **AI-powered Computer Vision** to map your facial expressions and hand gestures to iconic Clash Royale emotes in real-time. By leveraging **MediaPipe** and **OpenCV**, the application detects specific "trigger" gestures to overlay emotes directly onto the video feed.
+An advanced computer vision application using **MediaPipe** and **OpenCV** to map human facial expressions and hand gestures to a priority-based Augmented Reality (AR) overlay system. The project demonstrates high-fidelity tracking and complex gesture state management.
 
-## The Goal
+## Technical Architecture
 
-The primary objective of this project was to experiment with:
+The system utilizes two primary MediaPipe solutions running concurrently:
 
-* **Face Mapping**: Tracking 468 facial landmarks to detect smile ratios and proximity.
-* **Hand Tracking**: Detecting complex gestures like closed fists and spatial proximity to facial features.
-* **Real-time Interaction**: Creating a low-latency "Digital Puppet" experience where the user's movements control the visual output.
+1. **Face Mesh (Refined)**: Tracking 468 3D landmarks, including iris and lip-contour refinement for high-precision smile-ratio calculation.
+2. **Hand Landmarks**: Simultaneous tracking of two hands with 21 3D landmarks each, enabling complex pose estimation (e.g., finger state detection, fist clenching, and spatial proximity).
 
-## 🛠 Features
+### Gesture Logic & Priority Matrix
 
-* **Dual Window Output**:
-1. **Output Window**: A clean view showing only the triggered Clash Royale emotes.
-2. **Input Tracker**: A secondary window showing the raw face mesh and hand skeletal tracking for debugging.
+To prevent frame flickering and gesture overlap, the system employs a hierarchical priority check. If multiple conditions are met, the higher-priority emote is rendered.
+
+| Priority | Emote Trigger | Logic Implementation |
+| --- | --- | --- |
+| **1** | **Hide** | 2-Hand Open Palm detection + Nose Proximity ( units). |
+| **2** | **Waiting** | 1-Hand Logic: Palm at chin level + Index tip  Eye level. |
+| **3** | **Peace** | Finger state: Index/Middle Extended + Ring/Pinky Folded. |
+| **4** | **Flex** | 2-Fist detection + Knuckle  Eye level + Face Margin . |
+| **5** | **Excited** | Smile Ratio  + Hands at Mouth level (Fingers below nose). |
+| **6** | **Boohoo** | 2-Fist detection + Mouth Proximity ( units). |
+| **7** | **Smile** | Lip Landmark Distance Ratio . |
+| **8** | **Neutral** | Default state; no active flags detected. |
+
+---
+
+## Installation & Deployment
+
+### Environment Setup
+
+* **Python**: 3.8 or higher.
+* **Dependencies**:
+```bash
+pip install opencv-python mediapipe
+
+```
 
 
-* **Gesture Mapping**:
-* **Smile**: Triggers `smile.webp` using a width-to-eye ratio.
-* **Crying (Double Fists)**: Triggers `boohoo.webp` when both fists are held near the mouth.
-* **Hide (Open Hands)**: Triggers `hide.webp` when both hands are open and covering the face.
-* **Neutral**: Displays `neutral.webp` when no specific gestures are detected.
 
+### Asset Requirements
 
+The script expects a directory named `Assets/` in the root folder containing the following standardized image files:
+`neutral.png`, `smile.png`, `excited.png`, `boohoo.png`, `flex.png`, `hide.png`, `peace.png`, `waiting.png`.
 
-## 📂 Project Structure
+### Execution
+
+```python
+python main.py
+
+```
+
+---
+
+## Technical Features
+
+* **Coordinate Normalization**: Landmarks are calculated in normalized coordinates ( to ), ensuring the triggers work regardless of camera resolution or aspect ratio.
+* **Vertical Zone Segmentation**: Uses the -coordinates of the Nose Tip (Landmark 1) and Eyes (Landmark 33) as dynamic horizontal planes to separate "Excited" (lower zone) from "Waiting" (upper zone).
+* **Euclidean Proximity Checks**: Triggers are based on the mathematical distance between hand nodes and facial nodes ().
+
+## Repository Structure
 
 ```text
-Clash-Emotes/
-├── Main.py            # Main application logic
-├── README.md          # Project documentation
-├── Assets/            # Folder containing .webp emote files
-│   ├── smile.webp
-│   ├── boohoo.webp
-│   ├── hide.webp
-│   └── neutral.webp
-└── .venv/             # Python Virtual Environment
+├── Assets/             # Emote image overlays
+├── main.py             # Main execution script
+└── README.md           # Technical documentation
 
 ```
-
-## ⚙️ How to Run
-
-To set up this project on your machine, follow these steps:
-
-1. **Create and Activate Environment**:
-```bash
-python3 -m venv .venv
-source .venv/bin/python
-
-```
-
-
-2. **Install Dependencies**:
-```bash
-python3 -m pip install opencv-python mediapipe
-
-```
-
-
-3. **Run the Application**:
-Right-click `Main.py` in PyCharm and select **Run**, or use the terminal:
-```bash
-python3 Main.py
-
-```
-
-
-
-## 📝 Technical Details
-
-1. **Landmark Extraction**: The system identifies 3D face landmarks and 21 hand landmarks per hand.
-2. **Normalized Coordinates**: Gesture detection uses normalized  and  coordinates ( to ) to ensure the system works regardless of distance from the camera.
-3. **Proximity Bubbles**: Hand triggers are calculated using Euclidean distance between hand knuckles and the center of the face.
